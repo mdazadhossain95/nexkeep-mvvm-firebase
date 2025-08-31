@@ -1,0 +1,26 @@
+name: firebase_toolkit
+version: 0.1.0
+
+description: "Reusable Firebase services for Flutter apps"
+
+publish_to: 'none'
+
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  #firebase
+  firebase_core: ^4.0.0
+  firebase_auth: ^6.0.1
+  cloud_firestore: ^6.0.0
+  firebase_messaging: ^16.0.0
+  firebase_crashlytics: ^5.0.0
+  firebase_analytics: ^12.0.0
+  firebase_remote_config: ^6.0.0
+
+

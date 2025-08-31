@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "349432700609",
+    "firebase_url": "https://keep-7ffef-default-rtdb.firebaseio.com",
+    "project_id": "keep-7ffef",
+    "storage_bucket": "keep-7ffef.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:349432700609:android:0cb145b36b61d163bbbe40",
+        "android_client_info": {
+          "package_name": "net.nexoviasolutions.keep"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "349432700609-87varnbe9g5kipi93dch7ip5a1lcp1ub.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "net.nexoviasolutions.keep",
+            "certificate_hash": "46cf21dbee23134c39e8462ad6abcb78b027cd41"
+          }
+        },
+        {
+          "client_id": "349432700609-cm7h16ts5vultrsmr4tfsrp1i070q6e4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWaHFzUNNA1UPe04dPY3pZmzqaB7B1gEA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "349432700609-cm7h16ts5vultrsmr4tfsrp1i070q6e4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "349432700609-uku2n9dechbtqrduirji2sncl0ev40mn.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "net.nexoviasolutions.keep"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
