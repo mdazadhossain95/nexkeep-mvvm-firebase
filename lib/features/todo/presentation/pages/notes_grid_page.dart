@@ -1,87 +1,187 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_fonts/google_fonts.dart'; // Import Google Fonts
-
-import 'note_editor_page.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class NotesGridPage extends StatelessWidget {
-  // Function to show the popup dialog for adding/editing a note
-  void _showNoteDialog(BuildContext context, {String? noteId}) {
-    final _titleController = TextEditingController();
-    final _contentController = TextEditingController();
+  const NotesGridPage({super.key});
 
-    if (noteId != null) {
-      // If editing, load existing data
-      FirebaseFirestore.instance
-          .collection('notes')
-          .doc(noteId)
-          .get()
-          .then((doc) {
-        _titleController.text = doc['title'];
-        _contentController.text = doc['content'];
-      });
-    }
+  // Helper: "time ago" text
+  String _timeAgo(Timestamp ts) {
+    final dt = ts.toDate();
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} h ago';
+    if (diff.inDays < 7) return '${diff.inDays} d ago';
+    final weeks = (diff.inDays / 7).floor();
+    return '${weeks} w ago';
+  }
 
-    showDialog(
+  // Modern popup editor as a modal bottom sheet
+  Future<void> _openNoteSheet(
+    BuildContext context, {
+    DocumentSnapshot<Map<String, dynamic>>? note,
+  }) async {
+    final isEdit = note != null;
+    final titleCtl = TextEditingController(text: note?['title'] ?? '');
+    final contentCtl = TextEditingController(text: note?['content'] ?? '');
+    final formKey = GlobalKey<FormState>();
+    bool saving = false;
+
+    await showModalBottomSheet(
       context: context,
-      barrierDismissible: false, // Prevent dismissing by tapping outside
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return AlertDialog(
-          title: Text(noteId == null ? 'Add Note' : 'Edit Note'),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: _titleController,
-                  decoration: InputDecoration(labelText: 'Title'),
-                  maxLength: 100,
-                ),
-                SizedBox(height: 8),
-                TextField(
-                  controller: _contentController,
-                  decoration: InputDecoration(labelText: 'Content'),
-                  maxLines: 4,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-              },
-              child: Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                final title = _titleController.text;
-                final content = _contentController.text;
+        final viewInsets = MediaQuery.of(ctx).viewInsets.bottom;
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            Future<void> save() async {
+              if (!formKey.currentState!.validate()) return;
+              setState(() => saving = true);
+              final now = Timestamp.now();
+              final data = {
+                'title': titleCtl.text.trim(),
+                'content': contentCtl.text.trim(),
+                'updatedAt': now,
+              };
+              if (isEdit) {
+                await FirebaseFirestore.instance
+                    .collection('notes')
+                    .doc(note!.id)
+                    .update(data);
+              } else {
+                await FirebaseFirestore.instance.collection('notes').add({
+                  ...data,
+                  'createdAt': now,
+                  'archived': false,
+                  'deletedAt': null,
+                });
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+            }
 
-                if (noteId == null) {
-                  // Create a new note
-                  FirebaseFirestore.instance.collection('notes').add({
-                    'title': title,
-                    'content': content,
-                    'createdAt': Timestamp.now(),
-                    'updatedAt': Timestamp.now(),
-                    'archived': false,
-                    'deletedAt': null,
-                  });
-                } else {
-                  // Edit existing note
-                  FirebaseFirestore.instance.collection('notes').doc(noteId).update({
-                    'title': title,
-                    'content': content,
-                    'updatedAt': Timestamp.now(),
-                  });
-                }
+            Future<void> deleteNote() async {
+              if (!isEdit) return;
+              setState(() => saving = true);
+              await FirebaseFirestore.instance
+                  .collection('notes')
+                  .doc(note!.id)
+                  .delete();
+              if (ctx.mounted) Navigator.pop(ctx);
+            }
 
-                Navigator.of(ctx).pop(); // Close the dialog
-              },
-              child: Text('Save'),
-            ),
-          ],
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 200),
+              padding: EdgeInsets.only(bottom: viewInsets),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      blurRadius: 20,
+                      spreadRadius: 0,
+                      offset: const Offset(0, 10),
+                      color: Colors.black.withOpacity(0.1),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.black12,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          isEdit ? 'Edit note' : 'Add note',
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Form(
+                        key: formKey,
+                        child: Column(
+                          children: [
+                            TextFormField(
+                              controller: titleCtl,
+                              maxLength: 100,
+                              style: GoogleFonts.lato(fontSize: 16),
+                              decoration: const InputDecoration(
+                                labelText: 'Title',
+                                border: OutlineInputBorder(),
+                                filled: true,
+                              ),
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'Title required'
+                                  : null,
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: contentCtl,
+                              minLines: 4,
+                              maxLines: 8,
+                              style: GoogleFonts.roboto(fontSize: 14),
+                              decoration: const InputDecoration(
+                                labelText: 'Content',
+                                border: OutlineInputBorder(),
+                                filled: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          if (isEdit)
+                            IconButton.outlined(
+                              tooltip: 'Delete',
+                              onPressed: saving ? null : deleteNote,
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: saving ? null : () => Navigator.pop(ctx),
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            onPressed: saving ? null : save,
+                            icon: saving
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.check),
+                            label: Text(isEdit ? 'Save' : 'Create'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -89,91 +189,100 @@ class NotesGridPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = GoogleFonts.openSansTextTheme(
+      Theme.of(context).textTheme,
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Notes',
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.bold,
-          ),
+          'Nex Keep',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
         ),
+        centerTitle: true,
       ),
-      body: StreamBuilder<QuerySnapshot>(
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('notes')
-            .orderBy('updatedAt', descending: true) // Sorting by last updated
+            .orderBy('updatedAt', descending: true)
             .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
           }
-
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(child: Text('No notes available.'));
+          final docs = snap.data?.docs ?? [];
+          if (docs.isEmpty) {
+            return Center(
+              child: Text('No notes yet', style: textTheme.titleMedium),
+            );
           }
-
-          final notes = snapshot.data!.docs;
 
           return GridView.builder(
-            padding: EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            padding: const EdgeInsets.fromLTRB(12, 16, 12, 110),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.75, // Customize the grid aspect ratio
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
+              childAspectRatio: 0.82,
             ),
-            itemCount: notes.length,
-            itemBuilder: (ctx, index) {
-              final note = notes[index];
-              return GestureDetector(
-                onTap: () {
-                  // Open the dialog to edit the note
-                  _showNoteDialog(context, noteId: note.id);
-                },
-                child: Material(
-                  color: Colors.transparent,
-                  child: Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 6,
-                    shadowColor: Colors.black.withOpacity(0.1),
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Display note title with Google Font
-                          Text(
-                            note['title'],
-                            style: GoogleFonts.lato(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+            itemCount: docs.length,
+            itemBuilder: (ctx, i) {
+              final n = docs[i].data();
+              return InkWell(
+                onTap: () => _openNoteSheet(context, note: docs[i]),
+                borderRadius: BorderRadius.circular(18),
+                child: Card(
+                  elevation: 3,
+                  shadowColor: Colors.black12,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          n['title'] ?? '',
+                          style: GoogleFonts.lato(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black87,
                           ),
-                          SizedBox(height: 8),
-                          // Display note content with Google Font
-                          Text(
-                            note['content'],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: Text(
+                            n['content'] ?? '',
                             style: GoogleFonts.roboto(
                               fontSize: 14,
                               color: Colors.black54,
                             ),
-                            maxLines: 3,
+                            maxLines: 5,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          Spacer(),
-                          // Display note timestamp or last updated
-                          Text(
-                            'Last Updated: ${DateTime.now().difference(note['updatedAt'].toDate()).inHours} hours ago',
-                            style: GoogleFonts.openSans(
-                                fontSize: 12, color: Colors.grey),
-                          ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.schedule,
+                              size: 14,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Updated ${_timeAgo(n['updatedAt'] as Timestamp)}',
+                              style: GoogleFonts.openSans(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -182,14 +291,30 @@ class NotesGridPage extends StatelessWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Open the dialog to add a new note
-          _showNoteDialog(context);
-        },
-        child: Icon(Icons.add),
-        backgroundColor: Colors.blue,
+
+      // Centered, larger FAB
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: SizedBox(
+        width: 200,
+        height: 60,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.indigo[900], // navy blue
+            foregroundColor: Colors.white,       // text color
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(100),
+            ),
+          ),
+          onPressed: () => _openNoteSheet(context),
+          child: const Text(
+            'Add Notes +',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+        ),
       ),
+
+
     );
   }
 }

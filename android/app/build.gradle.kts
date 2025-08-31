@@ -95,10 +95,10 @@ android {
     }
 }
 
-// Crashlytics extension (ensures mapping upload on release)
-firebaseCrashlytics {
-    mappingFileUploadEnabled = true
-}
+//// Crashlytics extension (ensures mapping upload on release)
+//firebaseCrashlytics {
+//    mappingFileUploadEnabled = true
+//}
 
 flutter {
     source = "../.."

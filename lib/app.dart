@@ -10,7 +10,8 @@ class App extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'NexKeep',
+      debugShowCheckedModeBanner: false,
+      title: 'Nex Keep',
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
       routerConfig: goRouter, // Use GoRouter for navigation
     );
